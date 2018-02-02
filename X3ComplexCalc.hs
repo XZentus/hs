@@ -1,141 +1,120 @@
-﻿import Data.List
-import Data.Ratio
+import qualified Data.Map.Strict as M
+import Data.List
 import Text.Printf
 
-data Factory = Factory FactoryName [ProdUsing]
-    deriving Show
-data Ware = Ware WareName Prices
-    deriving (Show, Eq)
-data Prices = Prices Double Double Double   
-    deriving (Show, Eq)
-data ProdUsing = Prod Ware Rational 
-    deriving Show
-
 type FactoryName = String
+type CycleLength = Double
 type WareName = String
-type Complex = [Factory]
+type Prices = (Double, Double, Double)
+type Complex = [FactoryName]
 
-complex :: Complex
-complex = concatMap (uncurry replicate . (\(n, f) -> (n, findWFactory f)))
-    [ (,) 2 "Пар Завод ракет \"Булава\" L"
-    , (,) 1 "Пар Завод ракет \"Томагавк\" XL"
-    , (,) 2 "Пар Соевая фабрика XL"
-    , (,) 2 "Пар Соевая ферма XL"
-    , (,) 1 "Рудная шахта XL 1-15-30"
-    , (,) 1 "Рудная шахта XL 1-3-30"
-    , (,) 1 "Кремниевая шахта XL 1-58-20"
+data FactoryParams = FP CycleLength [(WareName, Double)]
+    deriving Show
+
+data WType = Raw | Inter | Final
+    deriving (Eq, Show)
+
+hms h m s = h * 60 * 60 + m * 60 + s
+h1 = hms 1 0 0
+m1 = hms 0 1 0
+s1 = hms 0 0 1
+
+wn <\> m = M.findWithDefault (999999999, 999999999, 999999999) wn m
+wf </> m = M.findWithDefault (FP h1 [("Error: not found: " ++ wf, -999999999)]) wf m
+
+waresDB :: M.Map WareName Prices
+waresDB = M.fromList [ mw "Energy Cells"                         12    16    20
+                     , mw "Ore"                                  50   128   206
+                     , mw "Silicon Wafers"                      232   504   776
+                     , mw "Tomahawk Heavy Missile"            20888 22460 24032
+                     , mw "Flail Barrage Missile"             26954 33692 40430
+                     , mw "Soja Husk"                           204   364   524
+                     , mw "Soja Beans"                           14    28    42
+                     ]
+    where mw n d1 d2 d3 = (n, (d1, d2, d3))
+
+factoriesDB :: M.Map FactoryName FactoryParams
+factoriesDB = M.fromList [ mf "Par Tomahawk Missile Manufacturing Plant XL" (hms  0 20  0) [("Energy Cells",          -3000)
+                                                                                           ,("Ore",                    -500)
+                                                                                           ,("Soja Husk",              -400)
+                                                                                           ,("Tomahawk Heavy Missile",   30)
+                                                                                           ]
+                         , mf "Par Flail Missile Production Facility L"     (hms  0 10  0) [("Energy Cells",           -750)
+                                                                                           ,("Ore",                    -125)
+                                                                                           ,("Soja Husk",              -100)
+                                                                                           ,("Flail Barrage Missile",     5)
+                                                                                           ]
+                         , mf "Par Soyery XL"                               m1             [("Energy Cells",           -150)
+                                                                                           ,("Soja Beans",             -120)
+                                                                                           ,("Soja Husk",                20)
+                                                                                           ]
+                         , mf "Par Soyfarm XL"                              m1             [("Energy Cells",           -150)
+                                                                                           ,("Soja Beans",              120)
+                                                                                           ]
+                         , mf "Par Ore Mine XL 1-15-30"                     (hms  0  1 15) [("Energy Cells",           -180)
+                                                                                           ,("Ore",                      30)
+                                                                                           ]
+                         , mf "Par Ore Mine XL 1-3-30"                      (hms  0  1  3) [("Energy Cells",           -180)
+                                                                                           ,("Ore",                      30)
+                                                                                           ]
+                         , mf "Silicon Mine XL 1-58-20"                     (hms  0  1 58) [("Energy Cells",           -480)
+                                                                                           ,("Silicon Wafers",           20)
+                                                                                           ]
+                         ]
+    where mf n c ws = (n, FP c ws)
+
+complex :: [FactoryParams]
+complex = concatMap (uncurry replicate . (\(n, f) -> (n, f </> factoriesDB)))
+    [ (,) 2 "Par Flail Missile Production Facility L"
+    , (,) 1 "Par Tomahawk Missile Manufacturing Plant XL"
+    , (,) 2 "Par Soyery XL"
+    , (,) 2 "Par Soyfarm XL"
+    , (,) 1 "Par Ore Mine XL 1-15-30"
+    , (,) 1 "Par Ore Mine XL 1-3-30"
+    , (,) 1 "Silicon Mine XL 1-58-20"
     ]
 
-complexWares = calcComplex complex
-printResults = mapM_ printPU complexWares   
+getWT x = if x > 0 then Final else Raw
 
-printPU = printProdUsing h
+wt1 <> wt2 = if wt1 == wt2 then wt1 else Inter
 
-printBalance :: [ProdUsing] -> Integer -> IO ()
-printBalance wares i = pb i 0 0 0 wares
-  where pb _ smin smed smax [] = do
-            putStrLn "------------------------------------------------------\n"
-            printf "\t%12.2f\t%12.2f\t%12.2f\n" smin smed smax
-        pb i smin smed smax ((Prod (Ware wn (Prices min med max)) r):pf) = do
-            putStr $ wn ++ ":\n\t"
-            let num = numerator r
-                den = denominator r
-                val = (fromIntegral (num * i)) / (fromIntegral den)
-                vmed = val * med
-                (vmin, vmax) = if val > 0 then (val * min, val * max) else (val * max, val * min)
-                (nmin, nmed, nmax) = (smin + vmin, smed + vmed, smax + vmax)
-            printf "\t%12.2f\n" val
-            printf "\t%12.2f\t%12.2f\t%12.2f\n" vmin vmed vmax
-            pb i nmin nmed nmax pf
+calcComplex :: [FactoryParams] -> M.Map WareName (WType, Double)
+calcComplex fs = cc fs M.empty
+  where cc [] m = m
+        cc ((FP l wares):ws) m = cc ws $ foldl' merge m wares
+          where  merge mp (wn, n) = case M.lookup wn m of
+                                         Just (wt, usn) -> M.insert wn (wt <> (getWT n), usn + n/l) mp
+                                         Nothing        -> M.insert wn (       getWT n,        n/l) mp
 
-printProdUsing :: Integer -> ProdUsing -> IO ()
-printProdUsing i (Prod (Ware wn _) r) = do
-    putStr $ wn ++ ":\n\t"
-    let num = numerator r
-        den = denominator r
-    print $ (fromIntegral (num * i)) / (fromIntegral den)
-
-calcComplex :: Complex -> [ProdUsing]
-calcComplex = cc []
+printBalance :: M.Map WareName (WType, Double) -> Double -> IO ()
+printBalance m l = do
+    sumsr <- print' raw (0,0,0)
+    putStrLn "------------------------------------------------------\n"
+    sumsi <- print' inter (0,0,0)
+    putStrLn "------------------------------------------------------\n"
+    sumsf <- print' final (0,0,0)
+    putStrLn "------------------------------------------------------\n" 
+    printSum $ sumsr <+> sumsi <+> sumsf
   where
-    cc :: [ProdUsing] -> Complex -> [ProdUsing]
-    cc pu [] = pu
-    cc pu (f@(Factory fn wares) : fs) = cc (foldr merge pu wares) fs
-    merge :: ProdUsing -> [ProdUsing] -> [ProdUsing]
-    merge i            []                                = [i]
-    merge i@(Prod w v) (p@(Prod w' v') : ws) | w == w'   = (Prod w $ v + v') : ws
-                                             | otherwise = p : (merge i ws)
-                                             
-
-hms h m s = s + m * 60 + h * 60 * 60
-h = 60 * 60
-m = 60
-
-errorWare n = Ware ("Ошибка: не найдено " ++ n) $ Prices 999999999 999999999 999999999
-errorFactory n = Factory ("Ошибка: не найдено " ++ n) [ Prod (errorWare n) (-999999999 % (hms  1  0  0)) ]
-
-waresDB :: [Ware]
-waresDB = [ makeWare "Батареи"                              12    16    20
-          , makeWare "Руда"                                 50   128   206
-          , makeWare "Кремниевые пластины"                 232   504   776
-          , makeWare "Тяжелая ракета \"Томагавк\""       20888 22460 24032
-          , makeWare "Заградительная ракета \"Булава\""  26954 33692 40430
-          , makeWare "Соевая мука"                         204   364   524
-          , makeWare "Соевые бобы"                          14    28    42
-          ]
-
-makeWare :: WareName -> Double -> Double -> Double -> Ware
-makeWare name min med max = Ware name $ Prices min med max
-
-findWare :: WareName -> Maybe Ware
-findWare n = find cond waresDB
-  where cond (Ware w _) = w == n
-
-findWErr :: WareName -> Ware
-findWErr n = case (findWare n) of
-                  Just ware -> ware
-                  Nothing   -> errorWare n
-
-factoriesDB :: [Factory]
-factoriesDB = [ Factory "Пар Завод ракет \"Булава\" L"    [ Prod (findWErr "Батареи")                          ( -750 % (hms  0 10  0))
-                                                          , Prod (findWErr "Руда")                             ( -125 % (hms  0 10  0))
-                                                          , Prod (findWErr "Соевая мука")                      ( -100 % (hms  0 10  0))
-                                                          , Prod (findWErr "Заградительная ракета \"Булава\"") (    5 % (hms  0 10  0))
-                                                          ]
-
-              , Factory "Пар Завод ракет \"Томагавк\" XL" [ Prod (findWErr "Батареи")                          (-3000 % (hms  0 20  0))
-                                                          , Prod (findWErr "Руда")                             ( -500 % (hms  0 20  0))
-                                                          , Prod (findWErr "Соевая мука")                      ( -400 % (hms  0 20  0))
-                                                          , Prod (findWErr "Тяжелая ракета \"Томагавк\"")      (   30 % (hms  0 20  0))
-                                                          ]
-
-              , Factory "Пар Соевая фабрика XL"           [ Prod (findWErr "Батареи")                          ( -150 % (hms  0  1  0))
-                                                          , Prod (findWErr "Соевые бобы")                      ( -120 % (hms  0  1  0))
-                                                          , Prod (findWErr "Соевая мука")                      (   20 % (hms  0  1  0))
-                                                          ]
-
-              , Factory "Пар Соевая ферма XL"             [ Prod (findWErr "Батареи")                          ( -150 % (hms  0  1  0))
-                                                          , Prod (findWErr "Соевые бобы")                      (  120 % (hms  0  1  0))
-                                                          ]
-
-              , Factory "Рудная шахта XL 1-15-30"         [ Prod (findWErr "Батареи")                          ( -180 % (hms  0  1 15))
-                                                          , Prod (findWErr "Руда")                             (   30 % (hms  0  1 15))
-                                                          ]
-
-              , Factory "Рудная шахта XL 1-3-30"          [ Prod (findWErr "Батареи")                          ( -180 % (hms  0  1  3))
-                                                          , Prod (findWErr "Руда")                             (   30 % (hms  0  1  3))
-                                                          ]
-
-              , Factory "Кремниевая шахта XL 1-58-20"     [ Prod (findWErr "Батареи")                          ( -480 % (hms  0  1 58))
-                                                          , Prod (findWErr "Кремниевые пластины")              (   20 % (hms  0  1 58))
-                                                          ]
-              ]
-
-findFactory :: FactoryName -> Maybe Factory
-findFactory n = find cond factoriesDB
-  where cond (Factory f _) = f == n
-
-findWFactory :: FactoryName -> Factory
-findWFactory n = case (findFactory n) of
-                      Just factory -> factory
-                      Nothing      -> errorFactory n
+    (s1, s2, s3) <+> (d1, d2, d3) = (s1 + d1, s2 + d2, s3 + d3)
+    raw   = M.toList $ M.filter (\(t, _) -> Raw   == t) m
+    inter = M.toList $ M.filter (\(t, _) -> Inter == t) m
+    final = M.toList $ M.filter (\(t, _) -> Final == t) m
+    print' :: [(WareName, (WType, Double))] -> (Double, Double, Double) -> IO (Double, Double, Double)
+    print' [] s = return s
+    print' ((wn, (wt, d)):ws) ss = do
+        putStr $ wn ++ ":\n\t"
+        printf "\t%12.2f\n" (d * l)
+        if d > 0
+        then printf "\t%12.2f\t%12.2f\t%12.2f\n" (pmin * d * l) (pmed * d * l) (pmax * d * l)
+        else printf "\t%12.2f\t%12.2f\t%12.2f\n" (pmax * d * l) (pmed * d * l) (pmin * d * l)
+        print' ws (smin', smed', smax')
+      where
+        prices@(pmin,pmed,pmax) = wn <\> waresDB
+        (s1, s2, s3) <>> (d1, d2, d3) = (s1 + d1 * d * l, s2 + d2 * d * l, s3 + d3 * d * l)
+        (s1, s2, s3) <<> (d1, d2, d3) = (s1 + d3 * d * l, s2 + d2 * d * l, s3 + d1 * d * l)
+        (smin', smed', smax') = if wt == Final then ss <>> prices else ss <<> prices
+    printSum :: (Double, Double, Double) -> IO () 
+    printSum (smin, smed, smax) = do
+        putStrLn "------------------------------------------------------\n"
+        printf "\t%12.2f\t%12.2f\t%12.2f\n" smin smed smax
