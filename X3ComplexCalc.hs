@@ -99,7 +99,7 @@ printBalance m l = do
     putStrLn   "------------------------------------------------------\n" 
   where
     (s1, s2, s3) <+> (d1, d2, d3) = (s1 + d1, s2 + d2, s3 + d3)
-    raw   = M.toList $ M.filter ((Raw ==)   . fst) m
+    raw   = M.toList $ M.filter ((Raw   ==) . fst) m
     inter = M.toList $ M.filter ((Inter ==) . fst) m
     final = M.toList $ M.filter ((Final ==) . fst) m
     print' :: [(WareName, (WType, Double))] -> (Double, Double, Double) -> IO (Double, Double, Double)
