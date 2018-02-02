@@ -88,18 +88,20 @@ calcComplex fs = cc fs M.empty
 
 printBalance :: M.Map WareName (WType, Double) -> Double -> IO ()
 printBalance m l = do
+    putStrLn "\n-------------------------RAW:-------------------------\n"
     sumsr <- print' raw (0,0,0)
-    putStrLn "------------------------------------------------------\n"
+    putStrLn "\n------------------------INTER:------------------------\n"
     sumsi <- print' inter (0,0,0)
-    putStrLn "------------------------------------------------------\n"
+    putStrLn "\n------------------------FINAL:------------------------\n"
     sumsf <- print' final (0,0,0)
-    putStrLn "------------------------------------------------------\n" 
+    putStrLn "\n-----------------------SUMMARY:-----------------------\n" 
     printSum $ sumsr <+> sumsi <+> sumsf
+    putStrLn   "------------------------------------------------------\n" 
   where
     (s1, s2, s3) <+> (d1, d2, d3) = (s1 + d1, s2 + d2, s3 + d3)
-    raw   = M.toList $ M.filter (\(t, _) -> Raw   == t) m
-    inter = M.toList $ M.filter (\(t, _) -> Inter == t) m
-    final = M.toList $ M.filter (\(t, _) -> Final == t) m
+    raw   = M.toList $ M.filter ((Raw ==)   . fst) m
+    inter = M.toList $ M.filter ((Inter ==) . fst) m
+    final = M.toList $ M.filter ((Final ==) . fst) m
     print' :: [(WareName, (WType, Double))] -> (Double, Double, Double) -> IO (Double, Double, Double)
     print' [] s = return s
     print' ((wn, (wt, d)):ws) ss = do
@@ -115,6 +117,4 @@ printBalance m l = do
         (s1, s2, s3) <<> (d1, d2, d3) = (s1 + d3 * d * l, s2 + d2 * d * l, s3 + d1 * d * l)
         (smin', smed', smax') = if wt == Final then ss <>> prices else ss <<> prices
     printSum :: (Double, Double, Double) -> IO () 
-    printSum (smin, smed, smax) = do
-        putStrLn "------------------------------------------------------\n"
-        printf "\t%12.2f\t%12.2f\t%12.2f\n" smin smed smax
+    printSum (smin, smed, smax) = printf "\t%12.2f\t%12.2f\t%12.2f\n" smin smed smax
