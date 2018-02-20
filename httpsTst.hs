@@ -1,9 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Data.Char
+import Data.Array
 import qualified Data.Text as T
 import Network.Connection
 import Network.HTTP.Conduit
+
+import Text.Regex
+import Text.Regex.Base
+--import Text.Regex.TDFA
+--import Text.Regex.TDFA.ByteString
 
 import qualified Data.ByteString.Lazy.Char8 as BS
 
@@ -29,6 +35,24 @@ data Passport = Passp { serial1 :: String
                       , date    :: Date
                       }
 
+
+main = do
+    let settings = mkManagerSettings (TLSSettingsSimple True False False) Nothing
+    manager <- newManager settings
+    
+    requestMain <- parseRequest mainUrl
+    --requestCaptcha <- parseRequest tokenUrl
+    
+    
+    resMain    <- httpLbs requestMain    manager
+    --resCaptcha <- httpLbs requestCaptcha manager
+    --print $ (BS.take 100 $ responseBody res) `BS.append` (BS.pack " ...")
+    --print $ responseCookieJar res
+    print $ responseBody resMain
+    --print $ matchAllText reCaptchaToken $ responseBody resMain
+
+
+
 mkDate :: Int -> Int -> Int -> Either String Date
 mkDate d m y = do
     year  <- if y > 1910 && y < 2020 then Right y else Left $ "Wrong year: " ++ show y
@@ -48,14 +72,8 @@ requestUrl = "https://service.nalog.ru/inn-proc.do"
 
 tmpFile    = "tmp.gif"
 
-main = do
-    request <- parseRequest mainUrl
-    let settings = mkManagerSettings (TLSSettingsSimple True False False) Nothing
-    manager <- newManager settings
-    res <- httpLbs request manager
-    print $ (BS.take 100 $ responseBody res) `BS.append` (BS.pack " ...")
-    print $ responseCookieJar res
-
+reCaptchaToken = mkRegex "name=\"captchaToken\" value=\"([0-9A-Z]+)\""
+tst = "<input type=\"hidden\" name=\"captchaToken\" value=\"EAD97A514D2052A0B65A607CC35A61288053D5FBA89CEECDEA6FC676BA3E84AD9500B9478234AC39B5B2573099FDBDD8\"/>"
 
 
 days :: [(Month, Int)]
