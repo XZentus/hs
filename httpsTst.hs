@@ -126,5 +126,3 @@ parsePassport p1 p2 p3 d | allDs     = Right $ Passp p1 p2 p3 d
                && length p2 == 2
                && length p3 == 6
                && (all isDigit $ p1 ++ p2 ++ p3)
-
-test = parseRecord "Исламов\tЗелимхан\tЗайндиевич\t24.02.1980\t36 14 987071\t06.05.2015"
