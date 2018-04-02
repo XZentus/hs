@@ -1,9 +1,13 @@
 import Data.Foldable
+import Control.Applicative
 
 data Tree a = Nil | Branch (Tree a) a (Tree a)   deriving (Eq, Show)
 
+sequenceA2list :: (Foldable t, Applicative f) => t (f a) -> f [a]
+sequenceA2list = foldr (\x y -> (:) <$> x <*> y) $ pure []
+
 traverse2list :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f [b]
-traverse2list = undefined
+traverse2list f cont = foldr (\x y -> (:) <$> (f x) <*> y) (pure []) cont
 
 printTest :: (Eq a, Show a) => String -> String -> a -> a -> IO ()
 printTest s1 s2 a1 a2 = do
