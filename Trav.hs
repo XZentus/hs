@@ -1,6 +1,6 @@
 import Data.Foldable
 
-data Tree a = Branch (Tree a) a (Tree a) | Nil
+data Tree a = Nil | Branch (Tree a) a (Tree a)   deriving (Eq, Show)
 
 traverse2list :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f [b]
 traverse2list = undefined
@@ -29,3 +29,7 @@ main = test
 
 unf4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
 unf4 f (a, b, c, d) = f a b c d
+
+instance Foldable Tree where
+    foldr f ini Nil = ini
+    foldr f ini (Branch l x r) = (foldr f (f x (foldr f ini r)) l)
