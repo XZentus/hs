@@ -70,6 +70,7 @@ instance Applicative Triple where
 
 instance Traversable Triple where
 --  traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
+    traverse f (Tr x y z) = Tr <$> (f x) <*> (f y) <*> (f z)
 --  sequenceA :: Applicative f => t (f a) -> f (t a) 
 
 main = testTriple
