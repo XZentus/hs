@@ -1,9 +1,18 @@
+{-# LANGUAGE TypeOperators #-}
+
 module Main where
 
 import Data.Foldable
 import Control.Applicative
 
-main = testTree
+main = do
+    return ()
+--    putStrLn $ "sequenceA (Cmps [Just (Right 2), Nothing])"
+--    putStrLn $ "Right (Cmps {getCmps = [Just 2,Nothing]})"
+--    print $ sequenceA (Cmps [Just (Right 2), Nothing])
+--    putStrLn $ "sequenceA (Cmps [Just (Left 2), Nothing])"
+--    putStrLn $ "Left 2"
+--    print $ sequenceA (Cmps [Just (Left 2), Nothing])
 
 sequenceA2list :: (Foldable t, Applicative f) => t (f a) -> f [a]
 sequenceA2list = foldr (\x y -> (:) <$> x <*> y) $ pure []
@@ -146,3 +155,16 @@ instance Traversable Tree where
 --  traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
     traverse _ Nil = pure Nil
     traverse f (Branch l x r) = Branch <$> (traverse f l) <*> (f x) <*> (traverse f r)
+
+infixr 9 |.|
+newtype (|.|) f g a = Cmps { getCmps :: f (g a) }  deriving (Eq,Show) 
+
+instance (Functor f, Functor g) => Functor (f |.| g) where
+    fmap f (Cmps x) = Cmps $ fmap (fmap f) x
+
+instance (Foldable f, Foldable g) => Foldable ((|.|) f g) where
+    foldMap h (Cmps x) = foldMap (foldMap h) x
+
+instance (Traversable f, Traversable g) => Traversable (f |.| g) where
+--  traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
+    traverse f (Cmps x) = Cmps <$> traverse (traverse f) x
