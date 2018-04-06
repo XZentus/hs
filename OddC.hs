@@ -25,7 +25,14 @@ instance Applicative OddC where
                                 t2 = f2 <$> xs
                                 rest  = fs1 <*> xs
                             in concat3OC t1 t2 rest
-    
+instance Monad OddC where
+    return = pure
+    (Un x1)         >>= f = f x1
+    (Bi x1 x2 fs1) >>= f = let t1 = f x1
+                               t2 = f x2
+                               rest = fs1 >>= f
+                           in concat3OC t1 t2 rest
+
 test1 = do
     let tst1 = Bi 'a' 'b' (Un 'c')
         tst2 = Bi 'd' 'e' (Bi 'f' 'g' (Un 'h'))
@@ -46,7 +53,7 @@ test2 = do
     print $ res
     putStrLn $ "Bi 'a' 'b' (Bi 'c' 'd' (Bi 'e' 'f' (Bi 'g' 'h' (Bi 'i' 'j' (Un 'k')))))"
     print $ res == Bi 'a' 'b' (Bi 'c' 'd' (Bi 'e' 'f' (Bi 'g' 'h' (Bi 'i' 'j' (Un 'k')))))
-{-
+
 test3 = do
     let tst1 = Bi 10 20 (Un 30)
         tst2 = Bi 1 2 (Bi 3 4 (Un 5))
@@ -57,6 +64,5 @@ test3 = do
         printCase r p = print res1 >>= \_ -> print pat1 >>= \_ -> print $ res1 == pat1
     printCase res1 pat1
     printCase res2 pat2
--}
-main = do
-    print $ Bi (+1) (+2) (Un (+3)) <*> Bi 10 20 (Un 30)
+
+main = test3
