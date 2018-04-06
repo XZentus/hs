@@ -1,10 +1,9 @@
 data OddC a = Un a | Bi a a (OddC a) deriving (Eq,Show)
 
 concat3OC :: OddC a -> OddC a -> OddC a -> OddC a
-concat3OC (Un x1) (Un x2) (Un x3)    = Bi x1 x2 (Un x3)
+concat3OC (Un x1) (Un x2) xs1        = Bi x1 x2 xs1
 concat3OC (Bi x1 x2 xs1) xs2 xs3     = Bi x1 x2 $ concat3OC     xs1 xs2 xs3
 concat3OC (Un x1) (Bi x2 x3 xs1) xs2 = Bi x1 x2 $ concat3OC (Un x3) xs1 xs2
-concat3OC (Un x1) (Un x2) xs1        = Bi x1 x2 xs1
 
 main = do
     let tst1 = Bi 'a' 'b' (Un 'c')
