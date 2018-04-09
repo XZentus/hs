@@ -34,35 +34,48 @@ newline = putStrLn ""
 puts_ = putStrLn
 
 main = do
+    print $ runPrsEP (pure 42) 0 "ABCDEFG"
+    puts_ $ "(0,Right (42,\"ABCDEFG\"))"
+    newline
     let charEP c = satisfyEP (== c)
-    print $ runPrsEP (charEP 'A') 0 "ABC"
-    puts_ $ "(1,Right ('A',\"BC\"))"
+        anyEP = satisfyEP (const True)
+        testP = (,) <$> anyEP <* charEP 'B' <*> anyEP
+    print $ runPrsEP testP 0 "ABCDE"
+    puts_ $ "(3,Right (('A','C'),\"DE\"))"
     newline
-    print $ runPrsEP (charEP 'A') 41 "BCD"
-    puts_ $ "(42,Left \"pos 42: unexpected B\")"
+    print $ parseEP testP "BCDE"
+    puts_ $ "Left \"pos 2: unexpected C\""
     newline
-    print $ runPrsEP (charEP 'A') 41 ""
-    puts_ $ "(42,Left \"pos 42: unexpected end of input\")"
-    newline
-    print $ parseEP (charEP 'A') "ABC"
-    puts_ $ "Right ('A',\"BC\")"
-    newline
-    print $ parseEP (charEP 'A') "BCD"
-    puts_ $ "Left \"pos 1: unexpected B\""
-    newline
-    print $ parseEP (charEP 'A') ""
+    print $ parseEP testP ""
     puts_ $ "Left \"pos 1: unexpected end of input\""
+    newline
+    print $ parseEP testP "B"
+    puts_ $ "Left \"pos 2: unexpected end of input\""
 
     
-
-
 newtype PrsEP a = PrsEP { runPrsEP :: Int -> String -> (Int, Either String (a, String)) }
+
+instance Functor PrsEP where
+    fmap f p = PrsEP (f' . succ) where
+      f' pos s = case runPrsEP p pos s  of
+                   (pos', Right (x, rest)) -> (pos', Right (f x, rest))
+                   (pos', Left e)          -> (pos', Left e)
+
+instance Applicative PrsEP where
+    pure x = PrsEP $ \p s -> (p, Right (x, s))
+    pf <*> pv = PrsEP f' where
+      f' :: Int -> String -> (Int, Either String (b, String))
+      f' pos s = do (pos1, val1) <- runPrsEP pf pos s
+                    (p', s') <- val1
+                    let (pos2, val2) = runPrsEP pv pos1 s'
+                    (p'', s'') <- val2
+                    return (pos2, (p' p'', s'') )
 
 parseEP :: PrsEP a -> String -> Either String (a, String)
 parseEP p  = snd . runPrsEP p 0
 
 satisfyEP :: (Char -> Bool) -> PrsEP Char
-satisfyEP f = PrsEP f' where
-    f' pos []                 = let p = pos + 1 in (p, Left $ "pos " ++ show p ++ ": unexpected end of input")
-    f' pos (x:xs) | f x       = let p = pos + 1 in (p, Right (x, xs))
-                  | otherwise = let p = pos + 1 in (p, Left $ "pos " ++ show p ++ ": unexpected " ++ [x])
+satisfyEP f = PrsEP (f' . succ) where
+    f' p []                 = (p, Left $ "pos " ++ show p ++ ": unexpected end of input")
+    f' p (x:xs) | f x       = (p, Right (x, xs))
+                | otherwise = (p, Left $ "pos " ++ show p ++ ": unexpected " ++ [x])
