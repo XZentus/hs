@@ -30,11 +30,39 @@ instance Monad PrsE where
                             result    <- runPrsE (kleis v') s'
                             return result
 
+newline = putStrLn ""
+puts_ = putStrLn
+
 main = do
-    print $ runPrsE (do {a <- charE 'A'; b <- charE 'B'; return (a,b)}) "ABC"
-    print $ (Right (('A','B'),"C") :: Either String ((Char, Char), String))
-    print $ runPrsE (do {a <- charE 'A'; b <- charE 'B'; return (a,b)}) "ACD"
-    print $ (Left "unexpected C" :: Either String ((Char, Char), String))
-    print $ runPrsE (do {a <- charE 'A'; b <- charE 'B'; return (a,b)}) "BCD"
-    print $ (Left "unexpected B" :: Either String ((Char, Char), String))
+    let charEP c = satisfyEP (== c)
+    print $ runPrsEP (charEP 'A') 0 "ABC"
+    puts_ $ "(1,Right ('A',\"BC\"))"
+    newline
+    print $ runPrsEP (charEP 'A') 41 "BCD"
+    puts_ $ "(42,Left \"pos 42: unexpected B\")"
+    newline
+    print $ runPrsEP (charEP 'A') 41 ""
+    puts_ $ "(42,Left \"pos 42: unexpected end of input\")"
+    newline
+    print $ parseEP (charEP 'A') "ABC"
+    puts_ $ "Right ('A',\"BC\")"
+    newline
+    print $ parseEP (charEP 'A') "BCD"
+    puts_ $ "Left \"pos 1: unexpected B\""
+    newline
+    print $ parseEP (charEP 'A') ""
+    puts_ $ "Left \"pos 1: unexpected end of input\""
+
     
+
+
+newtype PrsEP a = PrsEP { runPrsEP :: Int -> String -> (Int, Either String (a, String)) }
+
+parseEP :: PrsEP a -> String -> Either String (a, String)
+parseEP p  = snd . runPrsEP p 0
+
+satisfyEP :: (Char -> Bool) -> PrsEP Char
+satisfyEP f = PrsEP f' where
+    f' pos []                 = let p = pos + 1 in (p, Left $ "pos " ++ show p ++ ": unexpected end of input")
+    f' pos (x:xs) | f x       = let p = pos + 1 in (p, Right (x, xs))
+                  | otherwise = let p = pos + 1 in (p, Left $ "pos " ++ show p ++ ": unexpected " ++ [x])
