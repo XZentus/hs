@@ -4,9 +4,12 @@ data Expr = Arg
           | N Double
           | U UnaryOp Expr
           | B BinaryOp Expr Expr
+    deriving Eq
 
 data UnaryOp  = Sin | Cos | Tan | UMin
+    deriving Eq
 data BinaryOp = Add | Sub | Mul | Div
+    deriving Eq
 
 class EvalExpr e where
     eval :: e -> Double -> Double
@@ -36,7 +39,7 @@ instance Show Expr where
 instance EvalExpr Expr where
     eval Arg         x = x
 
-    eval (N n)       x = n
+    eval (N n)       _ = n
     
     eval (U Sin e)   x = sin $ eval e x
     eval (U Cos e)   x = cos $ eval e x
@@ -48,8 +51,27 @@ instance EvalExpr Expr where
     eval (B Mul l r) x = eval l x * eval r x
     eval (B Div l r) x = eval l x / eval r x
 
-testExpr = B Mul (U Sin (B Div (N 1) Arg))
-                 (U Cos (B Add (N 2) (B Sub (N 3) (N 2))))
+testExpr :: Expr
+testExpr = B Mul (U Sin (B Div (N 1) (B Add Arg (N 4.5))))
+                 (U Cos (B Add (N 2) (B Sub (B Mul Arg (N 3)) (U Cos (N 2)))))
+
+simplify :: Expr -> Expr
+simplify e = let e' = smpl e
+             in if e == e' then e else simplify e'
+  where
+    smpl (U op intern)      = let intern' = simplify intern
+                              in case intern' of
+                                  (N n) -> N $ eval (U op (N n)) undefined
+                                  _     -> U op intern'
+    smpl expr@(B op l r) = let l' = simplify l
+                               r' = simplify r
+                           in opt (B op l' r')
+      where
+        opt expr@(B _ (N _) (N _)) = N $ eval expr undefined
+        opt e                      = e
+
+    smpl expr = expr
+
 
 showExprResult :: Expr -> Double -> String
 showExprResult e x = "x = " ++ show x ++ "\n" ++ show e ++ " = " ++ show (eval e x)
@@ -71,10 +93,13 @@ main = do
     print testExpr
     let l = makeLambda testExpr
         args = [1 .. 1000000]
+        s = simplify testExpr
+        s' = makeLambda s
+    print s
     time1 <- getCurrentTime
-    print $ sum $ map l args -- (eval testExpr) args
+    print $ sum $ map (eval s) args
     time2 <- getCurrentTime
-    print $ sum $ map (eval testExpr) args -- l args
+    print $ sum $ map s' args
     time3 <- getCurrentTime
     putStrLn ""
     print $ diffUTCTime time2 time1
