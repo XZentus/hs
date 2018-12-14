@@ -12,55 +12,29 @@ primeFactors1 n = pf 3 n $ if n2 /= n then [2] else []
            
 primeFactors2 x = if leastFactor x == 1 then [x] else fdivs $ pf x []
   where
-    pf n ds | n == 1 = ds
+    pf n ds | n <= 1 = ds
             | otherwise = let lf = leastFactor n
                           in if lf == 1 then n : ds else pf (n `div` lf) $ lf : ds
     fdivs (x:y:ss) | x == y    = fdivs $ y:ss
                    | otherwise = x : (fdivs $ y:ss)
     fdivs x                    = x
 
-           
-leastFactor :: Integer -> Integer
-leastFactor x | x `rem`  2 == 0 =  2
-              | x `rem`  3 == 0 =  3
-              | x `rem`  5 == 0 =  5
-              | x `rem`  7 == 0 =  7
-              | x `rem` 11 == 0 = 11
-              | x `rem` 13 == 0 = 13
-              | x `rem` 17 == 0 = 17
-              | x `rem` 19 == 0 = 19
-              | x `rem` 23 == 0 = 23
-              | x `rem` 29 == 0 = 29
-              | x `rem` 31 == 0 = 31
-              | otherwise   = let m = ceiling $ sqrt $ fromIntegral x + 0.5;
-                                  flr = floor $ (fromIntegral m / 30) :: Integer
-                              in lf1 (7 + 30 * flr - 100) m
-  where
-    lf1, lf2 :: Integer -> Integer -> Integer
-    lf1 i m | i > m             = lf2 37 m
-            | x `rem` i        == 0 = i
-            | x `rem` (i +  4) == 0 = i +  4
-            | x `rem` (i +  6) == 0 = i +  6
-            | x `rem` (i + 10) == 0 = i + 10
-            | x `rem` (i + 12) == 0 = i + 12
-            | x `rem` (i + 16) == 0 = i + 16
-            | x `rem` (i + 22) == 0 = i + 22
-            | x `rem` (i + 24) == 0 = i + 24
-            | otherwise             = lf1 (i + 30) m
+smallPrimes = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113]
 
-    lf2 i m | i > m             = x
-            | x `rem` i        == 0 = i
-            | x `rem` (i +  4) == 0 = i +  4
-            | x `rem` (i +  6) == 0 = i +  6
-            | x `rem` (i + 10) == 0 = i + 10
-            | x `rem` (i + 12) == 0 = i + 12
-            | x `rem` (i + 16) == 0 = i + 16
-            | x `rem` (i + 22) == 0 = i + 22
-            | x `rem` (i + 24) == 0 = i + 24
-            | otherwise             = lf2 (i + 30) m
-            
-            
-            
+leastFactor :: Integer -> Integer
+leastFactor x = case sdv smallPrimes of
+                    Just x  -> x
+                    Nothing -> let m = ceiling $ sqrt $ fromIntegral x + 0.5;
+                               in lf1 7 m
+  where
+    sdv [] = Nothing
+    sdv (d:ds) = if x `rem` d == 0 then Just d else sdv ds
+    lf1 :: Integer -> Integer -> Integer
+    lf1 i m | i >= m             = x
+            | otherwise = case sdv (map (+i) [0,4,6,10,12,16,22,24]) of
+                             Just x  -> x
+                             Nothing -> lf1 (i + 30) m 
+
 main :: IO ()
 main = do
     input <- getLine
