@@ -38,11 +38,10 @@ instance Eq Result where
     (R _ _ p1) == (R _ _ p2) = p1 == p2
     (R _ _ p1) /= (R _ _ p2) = p1 /= p2
 
-nDigits = length number
 emptyResult = R [] 0 (-1)
 
 solveFun :: Int -> [Int] -> Result
-solveFun len = sf emptyResult nDigits
+solveFun len nums = sf emptyResult (length nums) nums
   where
     sf rmax rlen nums | rlen < len = rmax
                       | otherwise  = let slice = take len nums
