@@ -46,10 +46,10 @@ solveFun len = sf emptyResult nDigits
     sf rmax rlen nums | rlen < len = rmax
                       | otherwise  = let slice = take len nums
                                          sliceProd = product slice
-                                         (nlen, nnums) = (rlen - 1, tail nums)
-                                     in if sliceProd > rproduct rmax
-                                        then sf (R slice (nDigits - rlen) sliceProd) nlen nnums
-                                        else sf  rmax                                nlen nnums
+                                     in (if sliceProd > rproduct rmax
+                                         then sf (R slice (nDigits - rlen) sliceProd)
+                                         else sf  rmax)
+                                        (rlen - 1) $ tail nums
 
 main :: IO ()
 main = do
