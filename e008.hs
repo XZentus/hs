@@ -1,4 +1,5 @@
 import Data.Char
+import Control.Monad
 
 data Result = R { rdigits  :: [Int]
                 , roffset  :: Int
@@ -52,6 +53,4 @@ solveFun len = sf emptyResult nDigits
                                         (rlen - 1) $ tail nums
 
 main :: IO ()
-main = do
-    print $ solveFun  4 number
-    print $ solveFun 13 number
+main = forM_ [4, 13] $ \l -> print $ solveFun l number
