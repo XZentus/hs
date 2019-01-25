@@ -1,4 +1,4 @@
-import Data.Time
+import System.Random
 
 data Expr = Arg
           | N Double
@@ -51,14 +51,17 @@ instance EvalExpr Expr where
     eval (B Mul l r) x = eval l x * eval r x
     eval (B Div l r) x = eval l x / eval r x
 
-testExpr :: Expr
-testExpr = B Mul (U Sin (B Div (N 1) (B Add Arg (N 4.5))))
-                 (U Cos (B Add (N 2) (B Sub (B Mul Arg (N 3)) (U Cos (N 2)))))
+targetFun :: Double -> Double
+targetFun x = cos(2.16327*x) + x*0.3423 - 3.0;
 
 simplify :: Expr -> Expr
 simplify e = let e' = smpl e
              in if e == e' then e else simplify e'
   where
+    smpl (U UMin intern)    = let intern' = simplify intern
+                              in case intern' of
+                                  (N n) -> N $ -n
+                                  _     -> U UMin intern'
     smpl (U op intern)      = let intern' = simplify intern
                               in case intern' of
                                   (N n) -> N $ eval (U op (N n)) undefined
@@ -88,19 +91,92 @@ makeLambda (B Sub l r) = \x -> makeLambda l x - makeLambda r x
 makeLambda (B Mul l r) = \x -> makeLambda l x * makeLambda r x
 makeLambda (B Div l r) = \x -> makeLambda l x / makeLambda r x
 
+minValue             = -20.0
+maxValue             =  20.0
+argProbability       =   0.7
+functionProbability  =   0.5
+mutateArg           =    0.1;
+mutateNum           =    0.6;
+mutateFun           =    0.2;
+mutateMin           =   -2.0;
+mutateMax           =    2.0;
+
+initValueRange = (minValue, maxValue)
+mutValueRange  = (mutateMin, mutateMax)
+
+genExpr :: Int -> IO Expr
+genExpr depth | depth < 1 = do
+    rand <- randomIO :: IO Double
+    if rand < argProbability
+    then return Arg
+    else randomRIO initValueRange >>= return . N
+
+              | otherwise = do
+    rand <- randomIO :: IO Double
+    if rand < functionProbability
+    then do
+        l <- genExpr (depth - 1)
+        funId <- randomRIO (1, 8) :: IO Int
+        if funId <= 4
+        then return $ case funId of
+            1 -> U Sin l
+            2 -> U Cos l
+            3 -> U Tan l
+            4 -> U UMin l
+        else do
+            r <- genExpr (depth - 1)
+            return $ case funId of
+                5 -> B Add l r
+                6 -> B Sub l r
+                7 -> B Mul l r
+                8 -> B Div l r
+    else if rand < argProbability
+        then return Arg
+        else randomRIO initValueRange >>= return . N
+
+mutate :: Int -> Expr -> IO (Bool, Expr)
+mutate depth expr = do
+    rand <- randomIO :: IO Double
+    case expr of
+        Arg -> if rand < mutateArg
+               then do
+                   e' <- genExpr depth
+                   return (e' /= expr, e')
+               else return (False, expr)
+               
+        N n -> if rand < mutateNum
+               then randomRIO mutValueRange >>= return . (,) True . N . (n +)
+               else return (False, expr)
+               
+        U op l -> do
+                    (mutated, l') <- mutate (depth - 1) l
+                    if mutated
+                    then return $ (True, U op l')
+                    else if rand < mutateFun
+                         then do
+                             e' <- genExpr depth
+                             return (e' /= expr, e')
+                         else return (False, expr)
+                    
+        B op l r -> do
+                    (mutatedl, l') <- mutate (depth - 1) l
+                    (mutatedr, r') <- mutate (depth - 1) r
+                    if mutatedl || mutatedr
+                    then return $ (True, B op l' r')
+                    else if rand < mutateFun
+                         then do
+                             e' <- genExpr depth
+                             return (e' /= expr, e')
+                         else return (False, expr)
+
+
+
+-- test :: Int -> 
+test depth populationSize = do
+    e <- sequence . replicate populationSize $ (genExpr depth)
+    print e
+    
+
 main :: IO ()
 main = do
-    print testExpr
-    let l = makeLambda testExpr
-        args = [1 .. 1000000]
-        s = simplify testExpr
-        s' = makeLambda s
-    print s
-    time1 <- getCurrentTime
-    print $ sum $ map (eval s) args
-    time2 <- getCurrentTime
-    print $ sum $ map s' args
-    time3 <- getCurrentTime
-    putStrLn ""
-    print $ diffUTCTime time2 time1
-    print $ diffUTCTime time3 time2
+    return ()
