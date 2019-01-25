@@ -1,5 +1,11 @@
-import System.Random
+{-# LANGUAGE BangPatterns #-}
+
+import Data.Function
 import Data.List
+
+import Control.Monad
+
+import System.Random
 
 data Expr = Arg
           | N Double
@@ -57,21 +63,28 @@ maxValue             =  20.0
 argProbability       =   0.7
 functionProbability  =   0.5
 
-mutateArg            =   0.1;
-mutateNum            =   0.6;
-mutateFun            =   0.2;
-mutateMin            =  -2.0;
-mutateMax            =   2.0;
+mutateArg            =   0.1
+mutateNum            =   0.6
+mutateFun            =   0.2
+mutateMin            =  -2.0
+mutateMax            =   2.0
 
-fitnessMin           =   -7.0;
-fitnessMax           =    7.0;
-fitnessPoints        = 2000;
+fitnessMin           =   -7.0
+fitnessMax           =    7.0
+fitnessPoints        = 2000
 fitnessStep          = (fitnessMax - fitnessMin) / fromIntegral (fitnessPoints - 1);
 
-exceptionWeight      = 10000.0;
+exceptionWeight      = 10000.0
 
 initValueRange = (minValue, maxValue)
 mutValueRange  = (mutateMin, mutateMax)
+
+populationSize       =   50;
+individualsSurvive   =   20;
+chanceDuplicate      =    0.02
+
+depth                =   10
+targetPoints         = genPoints targetFun
 
 targetFun :: Double -> Double
 targetFun x = cos(2.16327*x) + x*0.3423 - 3.0;
@@ -80,13 +93,14 @@ genPoints = flip map [fitnessMin, fitnessMin + fitnessStep .. fitnessMax]
 
 genPointsExpr e = map (eval e) [fitnessMin, fitnessMin + fitnessStep .. fitnessMax]
 
-fitnessCalc :: [Double] -> Expr -> Double
-fitnessCalc pts e = foldl' f 0 pts
+fitnessCalc :: [Double] -> [Double] -> Double
+fitnessCalc = (sum .) . zipWith f
   where
-    f res x | num       = res + value
-            | otherwise = res + exceptionWeight
+    f n1 n2 | n1 == n2  = 0
+            | num       = value
+            | otherwise = exceptionWeight
       where
-        value = eval e x
+        value = abs $ n1 - n2
         num   = not $ isNaN value || isInfinite value
 
 simplify :: Expr -> Expr
@@ -179,18 +193,35 @@ mutate depth expr = do
                              return (e' /= expr, e')
                          else return (False, expr)
 
--- test :: Int -> 
-test depth populationSize = do
-    let pts = genPoints targetFun
+fitnessDefault = fitnessCalc targetPoints . genPointsExpr
+
+trainStep :: [(Double, Expr)] -> IO [(Double, Expr)]
+trainStep !population = do
+    p' <- mapM (mutate depth) $ map snd population
+    let merged = mergeWithMut population . map (\(_, e) -> (fitnessDefault e, e)) $ p'
+        sorted = take individualsSurvive $ sortBy (compare `on` fst) merged
+    rest <- sequence (replicate (populationSize - individualsSurvive) $ genExpr 10)
+    return $ sorted ++ map (\e -> (fitnessDefault e, e)) rest
+
+mergeWithMut :: [(Double, Expr)] -> [(Double, Expr)] -> [(Double, Expr)]
+mergeWithMut [] _ = []
+mergeWithMut _ [] = []
+mergeWithMut (i@(fit,  ind):pops)
+             (m@(fit', mut):muts) | fit < fit' = i : mergeWithMut pops muts
+                                  | otherwise  = m : mergeWithMut pops muts
+
+train :: Int -> [(Double, Expr)] -> IO [(Double, Expr)]
+train !n !population | n < 0     = return . map (\(fit, e) -> (fit, simplify e)) $ population
+                     | otherwise = do
+                         when (n `rem` 100 == 0)
+                             (putStrLn $ "Generations left: " ++ show n)
+                         trainStep population >>= train (n - 1)
+
+test depth populations = do
     e <- sequence . replicate populationSize $ (genExpr depth)
-    let e1 = head e
-    print e1
-    let fc = fitnessCalc pts e1
-    print fc
-    print $ simplify e1
-    print $ fitnessCalc pts $ simplify e1
-    
+    trained <- train populations . map (\e -> (fitnessDefault e, e)) $ e
+    forM_ (take 10 trained) $ \(fit, e) -> putStrLn $ show fit ++ "\n" ++ show e ++ "\n"
 
 main :: IO ()
 main = do
-    return ()
+    test 5 200
