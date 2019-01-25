@@ -1,4 +1,5 @@
 import System.Random
+import Data.List
 
 data Expr = Arg
           | N Double
@@ -50,9 +51,43 @@ instance EvalExpr Expr where
     eval (B Sub l r) x = eval l x - eval r x
     eval (B Mul l r) x = eval l x * eval r x
     eval (B Div l r) x = eval l x / eval r x
+    
+minValue             = -20.0
+maxValue             =  20.0
+argProbability       =   0.7
+functionProbability  =   0.5
+
+mutateArg            =   0.1;
+mutateNum            =   0.6;
+mutateFun            =   0.2;
+mutateMin            =  -2.0;
+mutateMax            =   2.0;
+
+fitnessMin           =   -7.0;
+fitnessMax           =    7.0;
+fitnessPoints        = 2000;
+fitnessStep          = (fitnessMax - fitnessMin) / fromIntegral (fitnessPoints - 1);
+
+exceptionWeight      = 10000.0;
+
+initValueRange = (minValue, maxValue)
+mutValueRange  = (mutateMin, mutateMax)
 
 targetFun :: Double -> Double
 targetFun x = cos(2.16327*x) + x*0.3423 - 3.0;
+
+genPoints = flip map [fitnessMin, fitnessMin + fitnessStep .. fitnessMax]
+
+genPointsExpr e = map (eval e) [fitnessMin, fitnessMin + fitnessStep .. fitnessMax]
+
+fitnessCalc :: [Double] -> Expr -> Double
+fitnessCalc pts e = foldl' f 0 pts
+  where
+    f res x | num       = res + value
+            | otherwise = res + exceptionWeight
+      where
+        value = eval e x
+        num   = not $ isNaN value || isInfinite value
 
 simplify :: Expr -> Expr
 simplify e = let e' = smpl e
@@ -78,31 +113,6 @@ simplify e = let e' = smpl e
 
 showExprResult :: Expr -> Double -> String
 showExprResult e x = "x = " ++ show x ++ "\n" ++ show e ++ " = " ++ show (eval e x)
-
-makeLambda :: Expr -> Double -> Double
-makeLambda Arg = id
-makeLambda (N n)       = const n
-makeLambda (U Sin e)   = \x -> sin $ makeLambda e x
-makeLambda (U Cos e)   = \x -> cos $ makeLambda e x
-makeLambda (U Tan e)   = \x -> tan $ makeLambda e x
-makeLambda (U UMin e)  = \x -> - (makeLambda e x)
-makeLambda (B Add l r) = \x -> makeLambda l x + makeLambda r x
-makeLambda (B Sub l r) = \x -> makeLambda l x - makeLambda r x
-makeLambda (B Mul l r) = \x -> makeLambda l x * makeLambda r x
-makeLambda (B Div l r) = \x -> makeLambda l x / makeLambda r x
-
-minValue             = -20.0
-maxValue             =  20.0
-argProbability       =   0.7
-functionProbability  =   0.5
-mutateArg           =    0.1;
-mutateNum           =    0.6;
-mutateFun           =    0.2;
-mutateMin           =   -2.0;
-mutateMax           =    2.0;
-
-initValueRange = (minValue, maxValue)
-mutValueRange  = (mutateMin, mutateMax)
 
 genExpr :: Int -> IO Expr
 genExpr depth | depth < 1 = do
@@ -169,12 +179,16 @@ mutate depth expr = do
                              return (e' /= expr, e')
                          else return (False, expr)
 
-
-
 -- test :: Int -> 
 test depth populationSize = do
+    let pts = genPoints targetFun
     e <- sequence . replicate populationSize $ (genExpr depth)
-    print e
+    let e1 = head e
+    print e1
+    let fc = fitnessCalc pts e1
+    print fc
+    print $ simplify e1
+    print $ fitnessCalc pts $ simplify e1
     
 
 main :: IO ()
