@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+--{-# LANGUAGE BangPatterns #-}
 
 import Data.Function
 import Data.List
@@ -79,8 +79,8 @@ exceptionWeight      = 10000.0
 initValueRange = (minValue, maxValue)
 mutValueRange  = (mutateMin, mutateMax)
 
-populationSize       =   50;
-individualsSurvive   =   20;
+populationSize       =   80;
+individualsSurvive   =   30;
 chanceDuplicate      =    0.02
 
 depth                =   10
@@ -196,7 +196,7 @@ mutate depth expr = do
 fitnessDefault = fitnessCalc targetPoints . genPointsExpr
 
 trainStep :: [(Double, Expr)] -> IO [(Double, Expr)]
-trainStep !population = do
+trainStep population = do
     p' <- mapM (mutate depth) $ map snd population
     let merged = mergeWithMut population . map (\(_, e) -> (fitnessDefault e, e)) $ p'
         sorted = take individualsSurvive $ sortBy (compare `on` fst) merged
@@ -211,11 +211,11 @@ mergeWithMut (i@(fit,  ind):pops)
                                   | otherwise  = m : mergeWithMut pops muts
 
 train :: Int -> [(Double, Expr)] -> IO [(Double, Expr)]
-train !n !population | n < 0     = return . map (\(fit, e) -> (fit, simplify e)) $ population
-                     | otherwise = do
-                         when (n `rem` 100 == 0)
-                             (putStrLn $ "Generations left: " ++ show n)
-                         trainStep population >>= train (n - 1)
+train n population | n < 0     = return . map (\(fit, e) -> (fit, simplify e)) $ population
+                   | otherwise = do
+                       when (n `rem` 100 == 0)
+                           (putStrLn $ "Generations left: " ++ show n)
+                       trainStep population >>= train (n - 1)
 
 test depth populations = do
     e <- sequence . replicate populationSize $ (genExpr depth)
@@ -224,4 +224,4 @@ test depth populations = do
 
 main :: IO ()
 main = do
-    test 5 200
+    test 10 1500
